@@ -1,0 +1,22 @@
+camera:
+  index: 0
+  width: 1280
+  height: 720
+  fps: 30
+
+gaze:
+  smoothing_window: 5
+  confidence_threshhold: 0.7
+
+cursor:
+  screen_padding: 50
+  movement_speed: 1.0
+  deadzone_radius: 10
+
+gestures: 
+  click_threshold: 0.04
+  scroll_sensitivity: 3.0
+
+voice:
+  language: "en-US"
+  energy_threshold: 300

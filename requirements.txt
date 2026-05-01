@@ -1,0 +1,21 @@
+# Core vision
+mediapipe==0.10.14
+opencv-python==4.10.0.84
+
+# Cursor control
+pyautogui==0.9.54
+pynput==1.7.7
+
+# Speech
+SpeechRecognition==3.10.4
+pyaudio==0.2.14
+
+# Smoothing
+filterpy==1.4.5
+numpy==1.26.4
+
+# Config
+PyYAML==6.0.2
+
+# Optional UI
+# PyQt6==6.7.1
