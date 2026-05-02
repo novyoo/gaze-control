@@ -10,6 +10,7 @@ import yaml
 import numpy as np
 from PIL import ImageFont, ImageDraw, Image
 from src.gaze.detector import FaceDetector
+from src.gaze.face_data import FaceData
 from src.gaze.estimator import GazeEstimator
 
 
@@ -69,7 +70,7 @@ def draw_text_pil(frame, text, pos,
 
 
 # ===================== DEBUG VISUALS =====================
-def draw_debug(frame, face, gaze_xy, fps, gaze_icon):
+def draw_debug(frame, face, gaze_xy, fps, gaze_icon, estimator=None):
     """Render all visual overlays (eyes, minimap, HUD)"""
     h_frame, w_frame = frame.shape[:2]
     gx, gy = gaze_xy
@@ -102,11 +103,14 @@ def draw_debug(frame, face, gaze_xy, fps, gaze_icon):
     cv2.circle(frame, (dot_x, dot_y), 6, (140, 238, 255), -1)
 
     # ---------- HUD TEXT ----------
+    # In draw_debug(), add this line to the HUD lines list:
     lines = [
         f"FPS: {fps:.1f}",
         f"Gaze X: {gx:.3f}",
         f"Gaze Y: {gy:.3f}",
         f"Confidence: {face.confidence:.2f}",
+        f"Blink: {'YES' if estimator.is_blinking else 'no'}",   # ADD THIS
+        f"EAR: {estimator._eye_aspect_ratio(face):.3f}",        # ADD THIS — helps tune threshold
     ]
 
     for i, line in enumerate(lines):
@@ -138,10 +142,10 @@ def main():
 
     # ---------- Camera Setup ----------
     cap = cv2.VideoCapture(config["camera"]["index"])
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, config["camera"]["width"])
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)        # ← add this line
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  config["camera"]["width"])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config["camera"]["height"])
-    cap.set(cv2.CAP_PROP_FPS, config["camera"]["fps"])
+    cap.set(cv2.CAP_PROP_FPS,          config["camera"]["fps"])
 
     print("Phase 2 running — press Q to quit")
 
@@ -180,7 +184,7 @@ def main():
 
             gaze_xy = smooth_gaze
 
-            frame = draw_debug(frame, face, gaze_xy, fps, gaze_icon)
+            frame = draw_debug(frame, face, gaze_xy, fps, gaze_icon, estimator)
 
         else:
             cv2.putText(frame, "No face detected", (20, 50),
