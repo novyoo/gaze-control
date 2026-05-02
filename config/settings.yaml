@@ -6,7 +6,7 @@ camera:
 
 gaze:
   smoothing_window: 5
-  confidence_threshhold: 0.7
+  confidence_threshold: 0.7
 
 cursor:
   screen_padding: 50
