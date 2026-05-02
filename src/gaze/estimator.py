@@ -1,49 +1,81 @@
-"""
-src/gaze/estimator.py
-Estimates gaze direction from iris position relative to eye corners.
-Output: normalized (gx, gy) in range [0, 1] — raw, no smoothing yet.
-"""
+# src/gaze/estimator.py
 
 import numpy as np
-from .detector import FaceData
+from .face_data import FaceData
 
 
 class GazeEstimator:
+
+    BLINK_EAR_THRESHOLD = 0.30
+
+    def __init__(self):
+        self._last_gaze = (0.5, 0.5)
+        self._is_blinking = False
+        self._ear = 0.0
+
     def estimate(self, face: FaceData) -> tuple[float, float]:
-        """
-        Returns (gaze_x, gaze_y) normalized 0..1.
-        
-        Method: iris position as fraction of eye width/height.
-        Left eye and right eye averaged for stability.
-        """
+        self._ear = self._eye_aspect_ratio(face)
+        self._is_blinking = self._ear < self.BLINK_EAR_THRESHOLD
+
+        if self._is_blinking:
+            return self._last_gaze
+
+        gaze_x = self._estimate_horizontal(face)
+        gaze_y = self._estimate_vertical(face)
+        self._last_gaze = (gaze_x, gaze_y)
+        return self._last_gaze
+
+    @property
+    def is_blinking(self) -> bool:
+        return self._is_blinking
+
+    def ear_value(self, face: FaceData) -> float:
+        return self._ear
+
+    def _estimate_horizontal(self, face: FaceData) -> float:
         left_gx  = self._iris_ratio(face.left_iris,  face.left_eye_corners)
         right_gx = self._iris_ratio(face.right_iris, face.right_eye_corners)
+        return float((left_gx + right_gx) / 2.0)
 
-        # Average both eyes — more robust than using one
-        gaze_x = (left_gx + right_gx) / 2.0
+    def _estimate_vertical(self, face: FaceData) -> float:
+        lm = face.landmarks
+        w, h = face.frame_w, face.frame_h
 
-        # Vertical: use left iris Y relative to eye bounding box
-        # We use left_eye_corners inner/outer to approximate the eye center Y
-        eye_center_y = (face.left_eye_corners[0][1] + face.left_eye_corners[1][1]) / 2
-        eye_h_approx = abs(face.left_iris[1] - eye_center_y) * 4  # rough estimate
-        gaze_y = np.clip(
-            (face.left_iris[1] - (eye_center_y - eye_h_approx / 2)) / max(eye_h_approx, 1),
-            0.0, 1.0
-        )
+        def px(idx):
+            return np.array([lm[idx].x * w, lm[idx].y * h])
 
-        return float(gaze_x), float(gaze_y)
+        left_y  = self._iris_y_ratio(face.left_iris,  px(159), px(145))
+        right_y = self._iris_y_ratio(face.right_iris, px(386), px(374))
+        return float((left_y + right_y) / 2.0)
+
+    def _eye_aspect_ratio(self, face: FaceData) -> float:
+        lm = face.landmarks
+        w, h = face.frame_w, face.frame_h
+
+        def px(idx):
+            return np.array([lm[idx].x * w, lm[idx].y * h])
+
+        def ear(top, bottom, inner, outer):
+            eye_h = np.linalg.norm(px(top)   - px(bottom))
+            eye_w = np.linalg.norm(px(inner) - px(outer))
+            return eye_h / max(eye_w, 1e-6)
+
+        left_ear  = ear(159, 145, 133, 33)
+        right_ear = ear(386, 374, 362, 263)
+        return (left_ear + right_ear) / 2.0
 
     def _iris_ratio(self, iris: np.ndarray, corners: tuple) -> float:
-        """
-        Where is the iris between the two eye corners?
-        Returns 0.0 (far left) to 1.0 (far right).
-        """
         inner, outer = corners
         eye_vec  = outer - inner
         iris_vec = iris  - inner
         eye_len  = np.linalg.norm(eye_vec)
-
         if eye_len < 1e-6:
-            return 0.5  # degenerate case — return center
-
+            return 0.5
         return float(np.clip(np.dot(iris_vec, eye_vec) / (eye_len ** 2), 0.0, 1.0))
+
+    def _iris_y_ratio(self, iris: np.ndarray,
+                      top: np.ndarray, bottom: np.ndarray) -> float:
+        eye_h = bottom[1] - top[1]
+        if abs(eye_h) < 1e-6:
+            return 0.5
+        return float(np.clip((iris[1] - top[1]) / eye_h, 0.0, 1.0))
