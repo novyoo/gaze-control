@@ -1,7 +1,7 @@
 camera:
   index: 0
-  width: 1280
-  height: 720
+  width: 640       # changed from 1280
+  height: 480      # changed from 720
   fps: 30
 
 gaze:
@@ -20,3 +20,18 @@ gestures:
 voice:
   language: "en-US"
   energy_threshold: 300
+
+screen:
+  auto_detect: true    # reads actual resolution at runtime
+  width: 1920          # fallback if auto_detect fails
+  height: 1080
+
+mapping:
+  # Gaze values outside this range are clamped (tuned for ~60cm camera distance)
+  gaze_x_min: 0.35
+  gaze_x_max: 0.65
+  gaze_y_min: 0.38
+  gaze_y_max: 0.62
+  # Padding so cursor doesn't need to look to extreme edges
+  screen_padding_x: 80   # pixels
+  screen_padding_y: 60
