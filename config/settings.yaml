@@ -11,8 +11,9 @@ gaze:
 cursor:
   screen_padding: 50
   movement_speed: 1.0
-  deadzone_radius: 10
-
+  smooth_factor: 0.12
+  deadzone_radius: 8
+  
 gestures: 
   click_threshold: 0.04
   scroll_sensitivity: 3.0
