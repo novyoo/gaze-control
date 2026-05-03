@@ -21,7 +21,10 @@ gestures:
 
 voice:
   language: "en-US"
-  energy_threshold: 300
+  energy_threshold: 300        # mic sensitivity — raise if background noise
+  pause_threshold: 0.8         # seconds of silence to end a phrase
+  dynamic_energy: true         # auto-adjusts to background noise
+  enabled: true
 
 screen:
   auto_detect: true    # reads actual resolution at runtime

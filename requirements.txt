@@ -19,3 +19,6 @@ PyYAML==6.0.2
 
 # Optional UI
 # PyQt6==6.7.1
+
+# Clipboard
+pyperclip==1.8.2
