@@ -13,9 +13,11 @@ cursor:
   movement_speed: 1.0
   deadzone_radius: 10
 
-gestures: 
-  click_threshold: 0.04
-  scroll_sensitivity: 3.0
+gestures:
+  click_threshold: 0.28        # just above your open-hand value of 0.211
+  two_finger_threshold: 0.28
+  drag_hold_seconds: 0.5
+  cooldown_seconds: 0.4        # lowered — scroll can fire more often
 
 voice:
   language: "en-US"
