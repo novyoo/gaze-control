@@ -27,11 +27,13 @@ screen:
   height: 1080
 
 mapping:
-  # Gaze values outside this range are clamped (tuned for ~60cm camera distance)
-  gaze_x_min: 0.35
-  gaze_x_max: 0.65
-  gaze_y_min: 0.38
-  gaze_y_max: 0.62
-  # Padding so cursor doesn't need to look to extreme edges
-  screen_padding_x: 80   # pixels
-  screen_padding_y: 60
+  gaze_x_min: 0.42      # was 0.35 — raise this if cursor won't reach left edge
+  gaze_x_max: 0.58      # was 0.65 — lower this if cursor won't reach right edge
+  gaze_y_min: 0.42      # was 0.38
+  gaze_y_max: 0.58      # was 0.62
+  screen_padding_x: 40  # was 80 — less padding = more screen coverage
+  screen_padding_y: 30  # was 60
+
+cursor:
+  smooth_factor: 0.08   # was 0.12 — lower = less jitter, smoother feel
+  deadzone_radius: 12   # was 8 — bigger deadzone = less fidgeting when still
