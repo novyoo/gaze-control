@@ -35,3 +35,8 @@ mapping:
   # Padding so cursor doesn't need to look to extreme edges
   screen_padding_x: 80   # pixels
   screen_padding_y: 60
+
+smoothing:
+  process_noise: 0.03       # lower = smoother but slower to respond
+  measurement_noise: 0.5    # higher = more smoothing, less raw noise
+  initial_uncertainty: 1.0
