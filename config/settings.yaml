@@ -11,22 +11,12 @@ gaze:
 cursor:
   screen_padding: 50
   movement_speed: 1.0
-<<<<<<< HEAD
-  deadzone_radius: 10
-
-gestures:
-  click_threshold: 0.28        # just above your open-hand value of 0.211
-  two_finger_threshold: 0.28
-  drag_hold_seconds: 0.5
-  cooldown_seconds: 0.4        # lowered — scroll can fire more often
-=======
   smooth_factor: 0.12
   deadzone_radius: 8
   
 gestures: 
   click_threshold: 0.04
   scroll_sensitivity: 3.0
->>>>>>> feature/kalman-smoothing
 
 voice:
   language: "en-US"
@@ -41,18 +31,6 @@ screen:
   height: 1080
 
 mapping:
-<<<<<<< HEAD
-  gaze_x_min: 0.42      # was 0.35 — raise this if cursor won't reach left edge
-  gaze_x_max: 0.58      # was 0.65 — lower this if cursor won't reach right edge
-  gaze_y_min: 0.42      # was 0.38
-  gaze_y_max: 0.58      # was 0.62
-  screen_padding_x: 40  # was 80 — less padding = more screen coverage
-  screen_padding_y: 30  # was 60
-
-cursor:
-  smooth_factor: 0.08   # was 0.12 — lower = less jitter, smoother feel
-  deadzone_radius: 12   # was 8 — bigger deadzone = less fidgeting when still
-=======
   # Gaze values outside this range are clamped (tuned for ~60cm camera distance)
   gaze_x_min: 0.35
   gaze_x_max: 0.65
@@ -66,4 +44,10 @@ smoothing:
   process_noise: 0.03       # lower = smoother but slower to respond
   measurement_noise: 0.5    # higher = more smoothing, less raw noise
   initial_uncertainty: 1.0
->>>>>>> feature/kalman-smoothing
+
+calibration:
+  points: 9                  # number of calibration points
+  samples_per_point: 30      # gaze samples collected per dot
+  hold_seconds: 1.5          # how long to stare at each dot
+  dot_radius: 20             # size of calibration dot
+  save_path: "config/calibration.json"
