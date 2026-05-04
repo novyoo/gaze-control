@@ -81,3 +81,31 @@ class GazeMapper:
         except Exception as e:
             print(f"[Mapper] Screen detect failed ({e}), using config fallback")
             return 1920, 1080
+        
+    def apply_calibration(self, calibrator) -> None:
+        """
+        If calibration exists, override the linear mapping
+        with calibrated polynomial mapping.
+        """
+        if calibrator.is_calibrated:
+            self._calibrator = calibrator
+            print("[Mapper] Calibration applied")
+
+    def map(self, gaze_x: float, gaze_y: float) -> tuple[int, int]:
+        # Use calibration if available
+        if hasattr(self, '_calibrator') and self._calibrator.is_calibrated:
+            gaze_x, gaze_y = self._calibrator.map(gaze_x, gaze_y)
+            # Skip the remap step — calibration already handles it
+            nx = float(np.clip(gaze_x, 0.0, 1.0))
+            ny = float(np.clip(gaze_y, 0.0, 1.0))
+            nx = 1.0 - nx   # still need to invert X
+        else:
+            nx = self._remap(gaze_x, self.gaze_x_min, self.gaze_x_max)
+            ny = self._remap(gaze_y, self.gaze_y_min, self.gaze_y_max)
+            nx = 1.0 - nx
+
+        px = int(self.usable_x_min + nx * (self.usable_x_max - self.usable_x_min))
+        py = int(self.usable_y_min + ny * (self.usable_y_max - self.usable_y_min))
+        px = int(np.clip(px, 0, self.screen_w - 1))
+        py = int(np.clip(py, 0, self.screen_h - 1))
+        return px, py
