@@ -1,7 +1,7 @@
 # run_phase8.py
 # Phase 8: 9-point calibration
 # Stare at each dot until it fills — system learns your gaze
-# Press R to restart | Q to quit
+# Press R to restart | Q to quit the screen
 
 import cv2
 import time
