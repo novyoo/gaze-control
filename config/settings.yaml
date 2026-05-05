@@ -14,9 +14,11 @@ cursor:
   smooth_factor: 0.12
   deadzone_radius: 8
   
-gestures: 
-  click_threshold: 0.04
-  scroll_sensitivity: 3.0
+gestures:
+  click_threshold: 0.28
+  two_finger_threshold: 0.28
+  drag_hold_seconds: 0.5
+  cooldown_seconds: 0.4
 
 voice:
   language: "en-US"
@@ -31,14 +33,12 @@ screen:
   height: 1080
 
 mapping:
-  # Gaze values outside this range are clamped (tuned for ~60cm camera distance)
-  gaze_x_min: 0.35
-  gaze_x_max: 0.65
+  gaze_x_min: 0.10
+  gaze_x_max: 0.87
   gaze_y_min: 0.38
-  gaze_y_max: 0.62
-  # Padding so cursor doesn't need to look to extreme edges
-  screen_padding_x: 80   # pixels
-  screen_padding_y: 60
+  gaze_y_max: 0.79
+  screen_padding_x: 40
+  screen_padding_y: 30
 
 smoothing:
   process_noise: 0.03       # lower = smoother but slower to respond

@@ -1,15 +1,15 @@
 # run_phase8.py
-# Phase 8: 9-point calibration
-# Stare at each dot until it fills — system learns your gaze
-# Press R to restart | Q to quit the screen
+# Phase 8: 9-point calibration — now with head compensation
+# Press N to set neutral | R to restart | Q to quit
 
 import cv2
 import time
 import yaml
 import numpy as np
-from src.gaze.detector        import FaceDetector
-from src.gaze.estimator       import GazeEstimator
-from src.smoothing.kalman     import GazeKalmanFilter
+import ctypes
+from src.gaze.detector          import FaceDetector
+from src.gaze.estimator         import GazeEstimator
+from src.smoothing.kalman       import GazeKalmanFilter
 from src.calibration.collector  import GazeSampleCollector
 from src.calibration.calibrator import GazeCalibrator
 
@@ -20,116 +20,127 @@ def load_config():
 
 
 def get_dot_pixel(point, sw, sh):
-    """
-    Convert normalized calibration point to pixel coords.
-    Padding scales with screen so dots are fully visible on any resolution.
-    """
-    padding_x = int(sw * 0.02)   # 2% of screen width
-    padding_y = int(sh * 0.02)   # 2% of screen height
-
+    padding_x = int(sw * 0.02)
+    padding_y = int(sh * 0.02)
     px = int(point.screen_x * (sw - 2 * padding_x) + padding_x)
     py = int(point.screen_y * (sh - 2 * padding_y) + padding_y)
     return px, py
 
 
 def draw_calibration(overlay, collector, state,
-                     gaze_px, sw, sh, fps):
-    overlay[:] = 10   # near black
+                     iris_px, sw, sh, fps,
+                     head_stable, neutral_set):
 
-    # ── Completed dots — green ────────────────────────────────────────
+    overlay[:] = 10
+
+    # Completed dots
     for point in collector.completed_points:
         px, py = get_dot_pixel(point, sw, sh)
-        cv2.circle(overlay, (px, py), 14, (0, 200, 80), -1)
+        cv2.circle(overlay, (px, py), 16, (0, 200, 80), -1)
         cv2.circle(overlay, (px, py),  6, (0, 255, 100), -1)
 
-    # ── Remaining dots — dim ──────────────────────────────────────────
+    # Remaining dots dim
     for i, point in enumerate(collector.points):
-        if point.complete:
-            continue
-        if i == collector.current:
+        if point.complete or i == collector.current:
             continue
         px, py = get_dot_pixel(point, sw, sh)
-        cv2.circle(overlay, (px, py), 14, (60, 60, 60), 1)
-        cv2.circle(overlay, (px, py),  4, (60, 60, 60), -1)
+        cv2.circle(overlay, (px, py), 14, (50, 50, 50), 1)
+        cv2.circle(overlay, (px, py),  4, (50, 50, 50), -1)
 
-    # ── Current active dot ────────────────────────────────────────────
+    # Current active dot
     if not collector.is_done:
-        point  = collector.current_point
-        px, py = get_dot_pixel(point, sw, sh)
+        point    = collector.current_point
+        px, py   = get_dot_pixel(point, sw, sh)
         progress = state.get("progress", 0.0)
-        status   = state.get("status", "waiting")
+        status   = state.get("status", "")
 
-        # Outer pulsing ring
+        # Pulsing ring
         pulse = int(20 + 8 * np.sin(time.time() * 4))
         cv2.circle(overlay, (px, py), pulse, (255, 255, 255), 1)
 
-        # Progress arc — fills as you hold gaze
+        # Progress arc
         if status == "collecting" and progress > 0:
-            angle = int(360 * progress)
-            axes  = (18, 18)
-            cv2.ellipse(overlay, (px, py), axes, -90, 0, angle,
+            cv2.ellipse(overlay, (px, py), (18, 18),
+                        -90, 0, int(360 * progress),
                         (0, 255, 100), 3)
 
-        # Center dot
-        color = (0, 255, 255) if status == "collecting" else (255, 255, 255)
+        # Center dot color by status
+        color = {
+            "collecting":  (0,   255, 100),
+            "hold_steady": (255, 255,   0),
+            "stabilizing": (255, 180,   0),
+            "get_ready":   (200, 200, 200),
+            "blink":       (0,   100, 255),
+        }.get(status, (255, 255, 255))
+
         cv2.circle(overlay, (px, py), 8, color, -1)
 
-        # Point number label
         idx = state.get("index", 0)
         cv2.putText(overlay,
                     f"{idx + 1}/{state.get('total', 9)}",
                     (px + 24, py + 6),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200,200,200), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+                    (180, 180, 180), 1)
 
-    # ── Gaze dot — where eyes are right now ───────────────────────────
-    if gaze_px:
-        gx, gy = gaze_px
-        cv2.circle(overlay, (gx, gy), 5, (100, 100, 255), -1)
+    # Iris position dot
+    if iris_px:
+        ix, iy = iris_px
+        cv2.circle(overlay, (ix, iy), 5, (100, 100, 255), -1)
 
-    # ── Instructions ──────────────────────────────────────────────────
+    # Status message
     if collector.is_done:
         cv2.putText(overlay, "Calibration complete!",
-                    (sw//2 - 180, sh//2 - 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 100), 2)
+                    (sw//2 - 200, sh//2 - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.2,
+                    (0, 255, 100), 2)
         cv2.putText(overlay, "Saving... press Q to finish",
                     (sw//2 - 200, sh//2 + 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200,200,200), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    (200, 200, 200), 1)
     else:
         status = state.get("status", "")
-        if status == "blink":
-            msg = "Keep eyes open and stare at the dot"
-        elif status == "waiting":
-            msg = "Look at the white dot"
-        elif status == "collecting":
-            msg = "Hold your gaze steady..."
-        else:
-            msg = "Get ready for next point"
-
+        msgs = {
+            "get_ready":   "Get ready — look at the dot when it appears",
+            "blink":       "Keep eyes OPEN — stare at the dot",
+            "stabilizing": "Hold your head STILL and stare at the dot",
+            "hold_steady": "Good — keep staring...",
+            "collecting":  "Collecting — keep staring!",
+            "next":        "Point done! Find the next dot",
+        }
+        msg   = msgs.get(status, "Look at the dot")
+        color = (0, 255, 100) if status == "collecting" else (200, 200, 200)
         cv2.putText(overlay, msg,
-                    (sw//2 - 200, sh - 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200,200,200), 1)
+                    (sw//2 - 280, sh - 80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 1)
 
-    # ── HUD ───────────────────────────────────────────────────────────
-    done_count = len(collector.completed_points)
+    # Head stability indicator
+    stab_color = (0, 255, 100) if head_stable else (0, 100, 255)
+    stab_text  = "Head: STABLE" if head_stable else "Head: MOVING — hold still"
+    cv2.putText(overlay, stab_text,
+                (sw//2 - 160, sh - 44),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, stab_color, 1)
+
+    # Neutral indicator
+    neutral_color = (0, 255, 100) if neutral_set else (255, 180, 0)
+    neutral_text  = "Neutral: SET" if neutral_set else "Press N = set neutral (look straight ahead first)"
+    cv2.putText(overlay, neutral_text,
+                (sw//2 - 280, sh - 16),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, neutral_color, 1)
+
+    # HUD
     cv2.putText(overlay,
-                f"FPS: {fps:.1f}  |  Points: {done_count}/9",
+                f"FPS: {fps:.1f}  |  Points: {len(collector.completed_points)}/9  |  N=neutral  R=restart  Q=quit",
                 (20, 36),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,0), 1)
-
-    cv2.putText(overlay, "R = restart  |  Q = quit",
-                (sw - 260, 36),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (120,120,120), 1)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 0), 1)
 
 
 def main():
     config     = load_config()
     detector   = FaceDetector(config)
     estimator  = GazeEstimator()
-    kalman     = GazeKalmanFilter(config)
     collector  = GazeSampleCollector(config)
     calibrator = GazeCalibrator(config)
 
-    import ctypes
     user32 = ctypes.windll.user32
     user32.SetProcessDPIAware()
     sw = user32.GetSystemMetrics(0)
@@ -141,15 +152,18 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config["camera"]["height"])
     cap.set(cv2.CAP_PROP_FPS,          config["camera"]["fps"])
 
-    overlay   = np.zeros((sh, sw, 3), dtype=np.uint8)
-    prev_time = time.time()
-    fps       = 0.0
-    state     = {}
-    gaze_px   = None
-    saved     = False
+    overlay     = np.zeros((sh, sw, 3), dtype=np.uint8)
+    prev_time   = time.time()
+    fps         = 0.0
+    state       = {}
+    iris_px     = None
+    saved       = False
+    neutral_set = False
 
     print("Phase 8 — Calibration")
-    print("Stare at each dot until it fills green")
+    print("1. Press N while looking straight at screen CENTER")
+    print("2. Then stare at each dot until it fills green")
+    print("3. Keep your head still — only move your EYES")
     print("R = restart | Q = quit")
 
     cv2.namedWindow("Calibration", cv2.WINDOW_NORMAL)
@@ -169,21 +183,31 @@ def main():
         fps       = 0.9 * fps + 0.1 * (1.0 / max(now - prev_time, 1e-6))
         prev_time = now
 
+        head_stable = False
+
         if face:
-            raw_gaze    = estimator.estimate(face)
-            is_blinking = estimator.is_blinking
+            # Get raw iris position (not compensated)
+            raw_iris_x, raw_iris_y = estimator._raw_iris_position(face)
+            head_yaw, head_pitch   = estimator._head_angles(face)
+            is_blinking            = estimator.is_blinking
 
-            # Kalman smooth the gaze
-            sx, sy = kalman.update(raw_gaze[0], raw_gaze[1])
+            # Run estimate to update head history
+            estimator.estimate(face)
+            head_stable = estimator.is_head_stable()
 
-            # Show gaze dot position on screen
-            gaze_px = (int(sx * sw), int(sy * sh))
+            # Show iris dot
+            iris_px = (int(raw_iris_x * sw), int(raw_iris_y * sh))
 
-            # Feed to collector
-            if not collector.is_done:
-                state = collector.update(sx, sy, is_blinking)
+            # Collect samples
+            if not collector.is_done and neutral_set:
+                state = collector.update(
+                    raw_iris_x, raw_iris_y,
+                    head_yaw, head_pitch,
+                    is_blinking,
+                    head_stable
+                )
 
-            # Auto-save when done
+            # Auto save when done
             if collector.is_done and not saved:
                 if calibrator.fit(collector):
                     calibrator.save()
@@ -191,20 +215,27 @@ def main():
                     print("Calibration saved!")
 
         draw_calibration(overlay, collector, state,
-                         gaze_px, sw, sh, fps)
+                         iris_px, sw, sh, fps,
+                         head_stable, neutral_set)
 
         cv2.imshow("Calibration", overlay)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
+        elif key == ord('n'):
+            if face:
+                estimator.set_neutral(face)
+                neutral_set = True
+                print("Neutral set — now stare at each dot")
+            else:
+                print("No face — look at camera first")
         elif key == ord('r'):
-            # Restart calibration
-            collector  = GazeSampleCollector(config)
-            calibrator = GazeCalibrator(config)
-            kalman     = GazeKalmanFilter(config)
-            saved      = False
-            print("Calibration restarted")
+            collector   = GazeSampleCollector(config)
+            calibrator  = GazeCalibrator(config)
+            saved       = False
+            neutral_set = False
+            print("Restarted")
 
     cap.release()
     detector.close()
